@@ -18,6 +18,7 @@ func main() {
 
 	mux.HandleFunc("POST /", server.HandleUpload)
 	mux.HandleFunc("GET /{id}", server.HandleServe)
+	mux.HandleFunc("GET /", http.NotFound)
 	mux.HandleFunc("GET /favicon.ico", http.NotFound)
 
 	slog.Info("starting http server", "port", config.Port)
