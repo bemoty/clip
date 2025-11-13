@@ -51,7 +51,8 @@ func (s *DiskStore) SaveFile(r io.Reader, ext string) (string, error) {
 }
 
 func (s *DiskStore) GetFile(id string) (string, bool) {
-	if len(id) != base64.URLEncoding.EncodedLen(IdByteLength) {
+	decoded, err := base64.URLEncoding.DecodeString(id)
+	if len(decoded) != IdByteLength || err != nil {
 		return "", false
 	}
 
