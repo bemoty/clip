@@ -62,7 +62,7 @@ func (s *Server) HandleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fullURL := "https://" + r.Host + "/" + id
+	fullURL := s.config.BaseURL + "/" + id
 	if _, err := w.Write([]byte(fullURL)); err != nil {
 		slog.Warn("failed to write response to client", "error", err)
 	}
