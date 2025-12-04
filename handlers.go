@@ -79,5 +79,11 @@ func (s *Server) HandleServe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	absBaseDir, err := filepath.Abs(s.store.BaseDir)
+	absPath, err2 := filepath.Abs(path)
+	if err != nil || err2 != nil || !strings.HasPrefix(absPath, absBaseDir+string(filepath.Separator)) {
+		http.NotFound(w, r)
+		return
+	}
 	http.ServeFile(w, r, path)
 }
