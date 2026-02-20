@@ -27,7 +27,7 @@ services:
 | Variable       | Description                                                                                                                       | Default               |
 |:---------------|:----------------------------------------------------------------------------------------------------------------------------------|:----------------------|
 | `PORT`         | The HTTP port to listen on                                                                                                        | `:8080`               |
-| `STORAGE_PATH` | Directory where images are stored                                                                                                 | `./data`              |
+| `STORAGE_PATH` | Directory where files are stored                                                                                                  | `./data`              |
 | `AUTH_KEY`     | Secret key for upload auth                                                                                                        | `no-auth`             |
 | `BASE_URL`     | Public URL used to generate links                                                                                                 | `http://i.bemoty.dev` |
 | `MAX_FILE_MB`  | Maximum file upload size                                                                                                          | `100`                 |
@@ -39,7 +39,7 @@ The server accepts a POST body at `/` and returns the URL to the uploaded file. 
 `curl`:
 
 ```console
-curl -X POST -H "Authorization: Bearer <AUTH_KEY>" -F "file=@/path/to/image.png" <BASE_URL>/
+curl -X POST -H "Authorization: Bearer <AUTH_KEY>" --data-binary "@<TARGET_FILE>" <BASE_URL>/
 ```
 
 ## License
