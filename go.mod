@@ -1,3 +1,3 @@
 module github.com/bemoty/clip
 
-go 1.25.4
+go 1.26.0

@@ -1,18 +1,18 @@
-FROM golang:1.25-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /app
 COPY go.mod ./
 RUN go mod download
+RUN mkdir -p /app/data
 COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o server .
 
-FROM alpine:3.23.3
+FROM scratch
 
-RUN apk --no-cache add ca-certificates
-WORKDIR /root/
+WORKDIR /root
 COPY --from=builder /app/server .
-RUN mkdir -p ./data
+COPY --from=builder /app/data /root/data
 
 EXPOSE 8080
 CMD ["./server"]
