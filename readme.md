@@ -1,6 +1,6 @@
 # clip
 
-A minimalist, self-hosted file upload and paste server written in Go. Helpful for sharing screenshots, code snippets,
+A minimalist, self-hostable file upload and paste server written in Go. Helpful for sharing screenshots, code snippets,
 and other files on services that don't support media sharing like IRC or TeamSpeak.
 
 ## Deployment
