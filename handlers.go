@@ -8,14 +8,23 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
+	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
+
+	"github.com/alecthomas/chroma"
+	"github.com/alecthomas/chroma/formatters/html"
+	"github.com/alecthomas/chroma/lexers"
+	"github.com/alecthomas/chroma/styles"
 )
 
 type Server struct {
 	config Config
 	store  *DiskStore
 }
+
+var langRegex = regexp.MustCompile(`^[a-z0-9]{1,20}$`)
 
 func (s *Server) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
@@ -25,7 +34,7 @@ func (s *Server) HandleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, 50<<20)
+	r.Body = http.MaxBytesReader(w, r.Body, s.config.MaxFileMB<<20)
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
@@ -41,20 +50,11 @@ func (s *Server) HandleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	contentType := http.DetectContentType(head[:n])
-	if !strings.HasPrefix(contentType, "image/") &&
-		!strings.HasPrefix(contentType, "video/") &&
-		!strings.HasPrefix(contentType, "audio/") {
-		http.Error(w, "Unsupported Media Type "+contentType, http.StatusUnsupportedMediaType)
-		return
+	contentType := r.Header.Get("Content-Type")
+	if contentType == "" || contentType == "application/octet-stream" {
+		contentType = http.DetectContentType(head[:n])
 	}
-
-	exts, err := mime.ExtensionsByType(contentType)
-	if len(exts) == 0 || err != nil {
-		http.Error(w, "Unknown Media Type "+contentType, http.StatusInternalServerError)
-		return
-	}
-	ext := exts[0]
+	ext := determineExtension(contentType, r.URL.Query().Get("lang"))
 
 	fullBody := io.MultiReader(bytes.NewReader(head[:n]), r.Body)
 	id, err := s.store.SaveFile(fullBody, ext)
@@ -70,6 +70,18 @@ func (s *Server) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("file uploaded", "id", id, "type", contentType, "url", fullURL)
+}
+
+func determineExtension(contentType, lang string) string {
+	if contentType == "text/plain" && langRegex.MatchString(lang) {
+		return "." + lang
+	}
+
+	exts, err := mime.ExtensionsByType(contentType)
+	if len(exts) == 0 || err != nil {
+		return ".bin"
+	}
+	return exts[0]
 }
 
 func (s *Server) HandleServe(w http.ResponseWriter, r *http.Request) {
@@ -88,5 +100,41 @@ func (s *Server) HandleServe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	http.ServeFile(w, r, path)
+
+	fileType := mime.TypeByExtension(filepath.Ext(path))
+	if strings.HasPrefix(fileType, "text/") && strings.Contains(r.Header.Get("Accept"), "text/html") {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			slog.Warn("failed to read file", "error", err)
+			http.NotFound(w, r)
+			return
+		}
+		if err := renderText(w, path, content, s.config.PasteStyle); err != nil {
+			slog.Warn("failed to render text file", "error", err)
+			http.ServeFile(w, r, path)
+		}
+	} else {
+		w.Header().Set("Content-Disposition", "inline; filename="+id+filepath.Ext(path))
+		http.ServeFile(w, r, path)
+	}
+}
+
+func renderText(w http.ResponseWriter, path string, content []byte, style string) error {
+	lexer := lexers.Match(path)
+	if lexer == nil {
+		lexer = lexers.Analyse(string(content))
+	}
+	if lexer == nil {
+		lexer = lexers.Fallback
+	}
+	lexer = chroma.Coalesce(lexer)
+
+	it, err := lexer.Tokenise(nil, string(content))
+	if err != nil {
+		return err
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	formatter := html.New(html.Standalone(true), html.WithClasses(true))
+	return formatter.Format(w, styles.Get(style), it)
 }

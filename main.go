@@ -10,7 +10,11 @@ func main() {
 	handler := slog.NewTextHandler(os.Stdout, nil)
 	slog.SetDefault(slog.New(handler))
 
-	config := LoadConfig()
+	config, err := LoadConfig()
+	if err != nil {
+		slog.Error("invalid config", "error", err)
+		os.Exit(1)
+	}
 	store := &DiskStore{config.StoragePath}
 	server := Server{config, store}
 
