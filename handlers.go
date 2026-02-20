@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/subtle"
 	"errors"
 	"io"
 	"log/slog"
@@ -19,7 +20,7 @@ type Server struct {
 func (s *Server) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	expectedAuthHeader := "Bearer " + s.config.AuthKey
-	if authHeader != expectedAuthHeader {
+	if subtle.ConstantTimeCompare([]byte(authHeader), []byte(expectedAuthHeader)) != 1 {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -86,5 +87,6 @@ func (s *Server) HandleServe(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	http.ServeFile(w, r, path)
 }
