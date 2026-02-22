@@ -3,9 +3,73 @@
 A minimalist, self-hostable file upload and paste server written in Go. Helpful for sharing screenshots, code snippets,
 and other files on services that don't support media sharing like IRC or TeamSpeak.
 
-## Deployment
+## Client
 
-Run it directly via Docker Compose using the GitHub Container Registry image.
+### Installation
+
+**macOS**
+
+```sh
+brew tap bemoty/tap
+brew install clip
+```
+
+**Windows**
+
+```sh
+scoop bucket add bemoty https://github.com/bemoty/scoop-bucket
+scoop install clip
+```
+
+**Arch Linux**
+
+```sh
+yay -S clip-bin
+```
+
+### Usage
+
+```
+clip [file] [flags]
+```
+
+With no arguments, clip reads from the clipboard. If stdin is piped, it reads from stdin instead. A file path can be
+passed as an argument to upload a specific file. Pass `-` as the file argument to explicitly read from stdin.
+
+```sh
+clip                        # upload clipboard contents
+clip note.txt               # upload a file
+clip note.txt --ttl 7d      # upload with a time to live
+cat main.go | clip -l go    # upload stdin with language hint
+clip -c                     # uploads clipboard contents and copies the link to clipboard (recommended for hotkeys)
+clip -                      # explicitly read from stdin
+```
+
+| Flag     | Short | Description                                     |
+|:---------|:------|:------------------------------------------------|
+| `--url`  |       | Server URL (overrides config)                   |
+| `--key`  |       | Auth key (overrides config)                     |
+| `--lang` | `-l`  | Language hint for syntax highlighting           |
+| `--ttl`  |       | Time to live (e.g. `7d`, `1h`)                  |
+| `--copy` | `-c`  | Immediately copy the returned link to clipboard |
+
+### Configuration
+
+On first use, run `clip config init` to create a config file. Open it with `clip config open`.
+
+| Key   | Description                      |
+|:------|:---------------------------------|
+| `url` | Server URL to upload to          |
+| `key` | Auth key for the server          |
+| `ttl` | Default time to live for uploads |
+
+Configuration can also be provided via environment variables: `CLIP_URL`, `CLIP_KEY`, `CLIP_TTL`.
+
+## Server
+
+### Deployment
+
+Run via Docker Compose using the GitHub Container Registry image.
 
 ```yaml
 services:
@@ -20,27 +84,18 @@ services:
     environment:
       - AUTH_KEY=your-secure-secret-key
       - BASE_URL=https://yourdomain.com
-````
-
-## Configuration
-
-| Variable       | Description                                                                                                                       | Default               |
-|:---------------|:----------------------------------------------------------------------------------------------------------------------------------|:----------------------|
-| `PORT`         | The HTTP port to listen on                                                                                                        | `:8080`               |
-| `STORAGE_PATH` | Directory where files are stored                                                                                                  | `./data`              |
-| `AUTH_KEY`     | Secret key for upload auth                                                                                                        | `no-auth`             |
-| `BASE_URL`     | Public URL used to generate links                                                                                                 | `http://i.bemoty.dev` |
-| `MAX_FILE_MB`  | Maximum file upload size                                                                                                          | `100`                 |
-| `PASTE_STYLE`  | The chroma style for code snippets; available styles can be found [here](https://github.com/alecthomas/chroma/tree/master/styles) | `dracula`             |
-
-## Usage
-
-The server accepts a POST body at `/` and returns the URL to the uploaded file. The easiest way to use this is via
-`curl`:
-
-```console
-curl -X POST -H "Authorization: Bearer <AUTH_KEY>" --data-binary "@<TARGET_FILE>" <BASE_URL>/
 ```
+
+### Configuration
+
+| Variable       | Description                                                                                                | Default               |
+|:---------------|:-----------------------------------------------------------------------------------------------------------|:----------------------|
+| `PORT`         | HTTP port to listen on                                                                                     | `:8080`               |
+| `STORAGE_PATH` | Directory where files are stored                                                                           | `./data`              |
+| `AUTH_KEY`     | Secret key for upload auth                                                                                 | `no-auth`             |
+| `BASE_URL`     | Public URL used to generate links                                                                          | `http://i.bemoty.dev` |
+| `MAX_FILE_MB`  | Maximum file upload size in MB                                                                             | `100`                 |
+| `PASTE_STYLE`  | Chroma style for code pastes — [available styles](https://github.com/alecthomas/chroma/tree/master/styles) | `dracula`             |
 
 ## License
 
