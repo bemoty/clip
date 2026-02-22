@@ -24,6 +24,7 @@ var RootCmd = &cobra.Command{
 	Example: `clip note.txt
 clip note.txt --ttl 7d
 cat main.go | clip -l go`,
+	Args:          cobra.MaximumNArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
