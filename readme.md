@@ -11,7 +11,7 @@ and other files on services that don't support media sharing like IRC or TeamSpe
 
 ```sh
 brew tap bemoty/tap
-brew install clip
+brew install bemoty/tap/clip
 ```
 
 **Windows**
