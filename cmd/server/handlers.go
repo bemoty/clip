@@ -73,7 +73,7 @@ func (s *Server) HandleUpload(w http.ResponseWriter, r *http.Request) {
 }
 
 func determineExtension(contentType, lang string) string {
-	if contentType == "text/plain" && langRegex.MatchString(lang) {
+	if strings.HasPrefix(contentType, "text/") && langRegex.MatchString(lang) {
 		return "." + lang
 	}
 
