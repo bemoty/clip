@@ -53,6 +53,14 @@ clip -                      # explicitly read from stdin
 | `--ttl`  |       | Time to live (e.g. `7d`, `1h`)                  |
 | `--copy` | `-c`  | Immediately copy the returned link to clipboard |
 
+### Shell completions
+
+```sh
+clip completion bash > /etc/bash_completion.d/clip
+clip completion zsh > "${fpath[1]}/_clip"
+clip completion fish > ~/.config/fish/completions/clip.fish
+```
+
 ### Configuration
 
 On first use, run `clip config init` to create a config file. Open it with `clip config open`.
