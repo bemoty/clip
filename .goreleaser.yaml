@@ -45,9 +45,9 @@ brews:
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     description: Upload your clipboard for sharing
-    install: bin.install "clip"
-    manpages:
-      - man/clip*.1
+    install: |
+      bin.install "clip"
+      man1.install Dir["man/clip*.1"]
     test: system "#{bin}/clip version"
 
 scoops:
