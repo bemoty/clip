@@ -1,0 +1,70 @@
+project_name: clip
+
+before:
+  hooks:
+    - go mod tidy
+    - mkdir -p man
+    - go run ./cmd/gen-man
+
+builds:
+  - &build
+    id: clip-unix
+    main: ./cmd/client
+    binary: clip
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+      - -X github.com/bemoty/clip/cmd/client/cmd.version={{.Version}}
+      - -X github.com/bemoty/clip/cmd/client/cmd.commit={{.ShortCommit}}
+      - -X github.com/bemoty/clip/cmd/client/cmd.date={{.Date}}
+  - <<: *build
+    id: clip-windows
+    goos: [windows]
+    goarch: [amd64]
+
+archives:
+  - id: unix
+    ids: [clip-unix]
+    format: tar.gz
+    files:
+      - man/*.1
+  - id: windows
+    ids: [clip-windows]
+    format: zip
+
+checksum:
+  name_template: checksums.txt
+
+brews:
+  - name: clip
+    repository:
+      owner: bemoty
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    description: Upload your clipboard for sharing
+    install: |
+      bin.install "clip"
+      man1.install Dir["man/clip*.1"]
+    test: system "#{bin}/clip version"
+
+scoops:
+  - repository:
+      owner: bemoty
+      name: scoop-bucket
+      token: "{{ .Env.SCOOP_BUCKET_TOKEN }}"
+    description: Upload your clipboard for sharing
+
+aurs:
+  - name: clip-bin
+    homepage: https://github.com/bemoty/clip
+    description: Upload your clipboard for sharing
+    maintainers: [Joshua Winkler <josh@bemoty.dev>]
+    license: MIT
+    private_key: "{{ .Env.AUR_SSH_PRIVATE_KEY }}"
+    git_url: ssh://aur@aur.archlinux.org/clip-bin.git
+    package: |
+      install -Dm755 "./clip" "${pkgdir}/usr/bin/clip"
+      for f in man/*.1; do
+        install -Dm644 "$f" "${pkgdir}/usr/share/man/man1/$(basename $f)"
+      done
