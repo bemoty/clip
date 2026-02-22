@@ -53,6 +53,35 @@ clip -                      # explicitly read from stdin
 | `--ttl`  |       | Time to live (e.g. `7d`, `1h`)                  |
 | `--copy` | `-c`  | Immediately copy the returned link to clipboard |
 
+### KDE Dolphin integration
+
+If you are using KDE Plasma or KDE Dolphin, you can use the `clip` command as a right-click action in Dolphin to quickly
+upload files.
+To do this, create `~/.local/share/kio/servicemenus/clip.desktop`, which will add a right-click "Upload with clip"
+action in Dolphin:
+
+```desktop
+[Desktop Entry]
+Type=Service
+MimeType=application/octet-stream;
+Actions=Upload
+X-KDE-ServiceTypes=KonqPopupMenu/Plugin
+
+[Desktop Action Upload]
+Name=Upload with clip
+Icon=edit-copy
+Exec=clip -c %F
+```
+
+Then make it executable:
+
+```sh
+chmod +x ~/.local/share/kio/servicemenus/clip.desktop
+```
+
+For more information on this feature,
+read [KDE documentation](https://develop.kde.org/docs/apps/dolphin/service-menus/).
+
 ### Shell completions
 
 ```sh
