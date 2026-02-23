@@ -21,12 +21,21 @@ scoop bucket add bemoty https://github.com/bemoty/scoop-bucket
 scoop install clip
 ```
 
-> **Note:** On Windows the binary is named `clipc` to avoid clashing with the built-in `clip.exe`. Use `clipc` in place of `clip` in all commands below.
+> **Note:** On Windows the binary is named `clipc` to avoid clashing with the built-in `clip.exe`. Use `clipc` in place
+> of `clip` in all commands below.
 
 **Arch Linux**
 
 ```sh
 yay -S clip-bin
+```
+
+**From source**
+
+Requires Go 1.26+.
+
+```sh
+go install github.com/bemoty/clip/cmd/client@latest
 ```
 
 ### Usage
@@ -125,16 +134,32 @@ services:
       - BASE_URL=https://yourdomain.com
 ```
 
+### Building from source
+
+Requires Go 1.26+.
+
+```sh
+git clone https://github.com/bemoty/clip
+go build -o server ./cmd/server
+./server
+```
+
+Or build a Docker image locally:
+
+```sh
+docker build -t clip .
+```
+
 ### Configuration
 
-| Variable       | Description                                                                                                | Default               |
-|:---------------|:-----------------------------------------------------------------------------------------------------------|:----------------------|
-| `PORT`         | HTTP port to listen on                                                                                     | `:8080`               |
-| `STORAGE_PATH` | Directory where files are stored                                                                           | `./data`              |
-| `AUTH_KEY`     | Secret key for upload auth                                                                                 | `no-auth`             |
-| `BASE_URL`     | Public URL used to generate links                                                                          | `http://i.bemoty.dev` |
-| `MAX_FILE_MB`  | Maximum file upload size in MB                                                                             | `100`                 |
-| `PASTE_STYLE`  | Chroma style for code pastes — [available styles](https://github.com/alecthomas/chroma/tree/master/styles) | `dracula`             |
+| Variable       | Description                                                                                                | Default                |
+|:---------------|:-----------------------------------------------------------------------------------------------------------|:-----------------------|
+| `PORT`         | HTTP port to listen on                                                                                     | `:8080`                |
+| `STORAGE_PATH` | Directory where files are stored                                                                           | `./data`               |
+| `AUTH_KEY`     | Secret key for upload auth                                                                                 | `no-auth`              |
+| `BASE_URL`     | Public URL used to generate links                                                                          | `https://i.bemoty.dev` |
+| `MAX_FILE_MB`  | Maximum file upload size in MB                                                                             | `100`                  |
+| `PASTE_STYLE`  | Chroma style for code pastes — [available styles](https://github.com/alecthomas/chroma/tree/master/styles) | `dracula`              |
 
 ## License
 
