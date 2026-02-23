@@ -18,7 +18,7 @@ import (
 )
 
 var RootCmd = &cobra.Command{
-	Use:   "clip",
+	Use:   binaryName,
 	Short: "Upload your clipboard for sharing",
 	Long:  "clip uploads your clipboard to a server and returns a shareable link for use with services like IRC or TS3",
 	Example: `clip note.txt
@@ -124,7 +124,7 @@ func upload(cmd *cobra.Command, r io.Reader) error {
 		if err := clipboard.WriteAll(uploadedURL); err != nil {
 			return err
 		}
-		err := beeep.Notify("clip", "Link copied to clipboard", "")
+		err := beeep.Notify(binaryName, "Link copied to clipboard", "")
 		if err != nil {
 			return err
 		}
@@ -149,7 +149,7 @@ func Execute() {
 }
 
 func init() {
-	beeep.AppName = "clip"
+	beeep.AppName = binaryName
 	cobra.OnInitialize(initConfig)
 
 	RootCmd.PersistentFlags().String("url", "", "Overrides the configured address of the server to upload to")

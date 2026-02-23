@@ -21,6 +21,8 @@ scoop bucket add bemoty https://github.com/bemoty/scoop-bucket
 scoop install clip
 ```
 
+> **Note:** On Windows the binary is named `clipc` to avoid clashing with the built-in `clip.exe`. Use `clipc` in place of `clip` in all commands below.
+
 **Arch Linux**
 
 ```sh

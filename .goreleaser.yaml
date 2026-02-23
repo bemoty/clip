@@ -22,6 +22,7 @@ builds:
       - -X github.com/bemoty/clip/cmd/client/cmd.date={{.Date}}
   - <<: *build
     id: clip-windows
+    binary: clipc
     goos: [windows]
     goarch: [amd64]
 
