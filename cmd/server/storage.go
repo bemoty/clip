@@ -1,11 +1,17 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"io"
+	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 )
 
 type DiskStore struct {
@@ -14,6 +20,70 @@ type DiskStore struct {
 
 // IdByteLength must not be less than 3, or the sharding logic will panic (minimum 5 for sensible file names)
 const IdByteLength = 6
+
+func NewDiskStore(ctx context.Context, config Config) *DiskStore {
+	store := &DiskStore{BaseDir: config.StoragePath}
+	go store.sweep(ctx, config.SweepInterval)
+	return store
+}
+
+func (s *DiskStore) sweep(ctx context.Context, sweepInterval time.Duration) {
+	ticker := time.NewTicker(sweepInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.performCleanup()
+		}
+	}
+}
+
+func (s *DiskStore) performCleanup() {
+	metaDir := filepath.Join(s.BaseDir, ".meta")
+	err := filepath.WalkDir(metaDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			slog.Warn("sweep: walk error", "path", path, "error", err)
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			slog.Warn("sweep: failed to read meta file", "path", path, "error", err)
+			return nil
+		}
+		expiry, err := time.Parse(time.RFC3339, string(data))
+		if err != nil {
+			slog.Warn("sweep: failed to parse meta file", "path", path, "error", err)
+			return nil
+		}
+		if !time.Now().After(expiry) {
+			return nil
+		}
+		rel, err := filepath.Rel(metaDir, path)
+		if err != nil {
+			return nil
+		}
+		parts := strings.Split(rel, string(filepath.Separator))
+		if len(parts) != 3 {
+			return nil
+		}
+		id := parts[0] + parts[1] + parts[2]
+		if err := s.DeleteFile(id); err != nil && !errors.Is(err, os.ErrNotExist) {
+			slog.Warn("sweep: failed to delete expired file", "id", id, "error", err)
+		}
+		if err := s.DeleteMeta(id); err != nil && !errors.Is(err, os.ErrNotExist) {
+			slog.Warn("sweep: failed to delete expired meta", "id", id, "error", err)
+		}
+		return nil
+	})
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		slog.Warn("sweep failed", "error", err)
+	}
+}
 
 func (s *DiskStore) SaveFile(r io.Reader, ext string) (string, error) {
 	for {
@@ -66,6 +136,51 @@ func (s *DiskStore) GetFile(id string) (string, bool) {
 	}
 
 	return matches[0], true
+}
+
+func (s *DiskStore) DeleteFile(id string) error {
+	path, ok := s.GetFile(id)
+	if !ok {
+		return os.ErrNotExist
+	}
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	dir := filepath.Dir(path)
+	_ = os.Remove(dir)
+	_ = os.Remove(filepath.Dir(dir))
+	return nil
+}
+
+func (s *DiskStore) GetMeta(id string) (time.Time, error) {
+	contents, err := os.ReadFile(s.metaPath(id))
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.Parse(time.RFC3339, string(contents))
+}
+
+func (s *DiskStore) WriteMeta(id string, expiry time.Duration) error {
+	path := s.metaPath(id)
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(time.Now().Add(expiry).Format(time.RFC3339)), 0644)
+}
+
+func (s *DiskStore) DeleteMeta(id string) error {
+	path := s.metaPath(id)
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	dir := filepath.Dir(path)
+	_ = os.Remove(dir)
+	_ = os.Remove(filepath.Dir(dir))
+	return nil
+}
+
+func (s *DiskStore) metaPath(id string) string {
+	return filepath.Join(s.BaseDir, ".meta", id[:2], id[2:4], id[4:])
 }
 
 func generateId(length int) (string, error) {

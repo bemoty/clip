@@ -180,9 +180,6 @@ func initConfig() {
 	if err := viper.BindPFlag("key", RootCmd.PersistentFlags().Lookup("key")); err != nil {
 		panic(err)
 	}
-	if err := viper.BindPFlag("ttl", RootCmd.Flags().Lookup("ttl")); err != nil {
-		panic(err)
-	}
 
 	if err := viper.ReadInConfig(); err != nil {
 		var notFound viper.ConfigFileNotFoundError

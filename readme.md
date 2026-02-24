@@ -105,11 +105,10 @@ clip completion fish > ~/.config/fish/completions/clip.fish
 
 On first use, run `clip config init` to create a config file. Open it with `clip config open`.
 
-| Key   | Description                      |
-|:------|:---------------------------------|
-| `url` | Server URL to upload to          |
-| `key` | Auth key for the server          |
-| `ttl` | Default time to live for uploads |
+| Key   | Description             |
+|:------|:------------------------|
+| `url` | Server URL to upload to |
+| `key` | Auth key for the server |
 
 Configuration can also be provided via environment variables: `CLIP_URL`, `CLIP_KEY`, `CLIP_TTL`.
 
@@ -152,14 +151,16 @@ docker build -t clip .
 
 ### Configuration
 
-| Variable       | Description                                                                                                | Default                |
-|:---------------|:-----------------------------------------------------------------------------------------------------------|:-----------------------|
-| `PORT`         | HTTP port to listen on                                                                                     | `:8080`                |
-| `STORAGE_PATH` | Directory where files are stored                                                                           | `./data`               |
-| `AUTH_KEY`     | Secret key for upload auth                                                                                 | `no-auth`              |
-| `BASE_URL`     | Public URL used to generate links                                                                          | `https://i.bemoty.dev` |
-| `MAX_FILE_MB`  | Maximum file upload size in MB                                                                             | `100`                  |
-| `PASTE_STYLE`  | Chroma style for code pastes — [available styles](https://github.com/alecthomas/chroma/tree/master/styles) | `dracula`              |
+| Variable         | Description                                                                                                | Default                |
+|:-----------------|:-----------------------------------------------------------------------------------------------------------|:-----------------------|
+| `PORT`           | HTTP port to listen on                                                                                     | `:8080`                |
+| `STORAGE_PATH`   | Directory where files are stored                                                                           | `./data`               |
+| `AUTH_KEY`       | Secret key for upload auth                                                                                 | `no-auth`              |
+| `BASE_URL`       | Public URL used to generate links                                                                          | `https://i.bemoty.dev` |
+| `MAX_FILE_MB`    | Maximum file upload size in MB                                                                             | `100`                  |
+| `PASTE_STYLE`    | Chroma style for code pastes — [available styles](https://github.com/alecthomas/chroma/tree/master/styles) | `dracula`              |
+| `DEFAULT_TTL`    | The default time to live for uploads                                                                       |                        |
+| `SWEEP_INTERVAL` | Interval duration between file cleanup sweeps for uploads with TTL                                         | `1h`                   |
 
 ## License
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/subtle"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"mime"
@@ -11,7 +12,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alecthomas/chroma"
 	"github.com/alecthomas/chroma/formatters/html"
@@ -26,12 +29,24 @@ type Server struct {
 
 var langRegex = regexp.MustCompile(`^[a-z0-9]{1,20}$`)
 
+const maxTTL = 365 * 24 * time.Hour
+
 func (s *Server) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	expectedAuthHeader := "Bearer " + s.config.AuthKey
 	if subtle.ConstantTimeCompare([]byte(authHeader), []byte(expectedAuthHeader)) != 1 {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
+	}
+
+	ttl := s.config.DefaultTTL
+	if ttlStr := r.URL.Query().Get("ttl"); ttlStr != "" {
+		var err error
+		ttl, err = parseTTL(ttlStr)
+		if err != nil {
+			http.Error(w, "Invalid TTL", http.StatusBadRequest)
+			return
+		}
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, s.config.MaxFileMB<<20)
@@ -62,6 +77,12 @@ func (s *Server) HandleUpload(w http.ResponseWriter, r *http.Request) {
 		slog.Error("failed to save file", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
+	}
+
+	if ttl > 0 {
+		if err := s.store.WriteMeta(id, ttl); err != nil {
+			slog.Warn("failed to write ttl metadata", "id", id, "error", err)
+		}
 	}
 
 	fullURL := s.config.BaseURL + "/" + id
@@ -99,6 +120,23 @@ func (s *Server) HandleServe(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+
+	expiry, metaErr := s.store.GetMeta(id)
+	if metaErr != nil && !errors.Is(metaErr, os.ErrNotExist) {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	if metaErr == nil && time.Now().After(expiry) {
+		if err := s.store.DeleteFile(id); err != nil {
+			slog.Warn("failed to delete expired file", "id", id, "error", err)
+		}
+		if err := s.store.DeleteMeta(id); err != nil {
+			slog.Warn("failed to delete expired file metadata", "id", id, "error", err)
+		}
+		http.Error(w, "Gone", http.StatusGone)
+		return
+	}
+
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 
 	fileType := mime.TypeByExtension(filepath.Ext(path))
@@ -117,6 +155,31 @@ func (s *Server) HandleServe(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", "inline; filename="+id+filepath.Ext(path))
 		http.ServeFile(w, r, path)
 	}
+}
+
+func parseTTL(s string) (time.Duration, error) {
+	if strings.HasSuffix(s, "d") {
+		n, err := strconv.Atoi(strings.TrimSuffix(s, "d"))
+		if err != nil {
+			return 0, fmt.Errorf("invalid ttl %q", s)
+		}
+		return validateTTL(time.Duration(n) * 24 * time.Hour)
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return 0, err
+	}
+	return validateTTL(d)
+}
+
+func validateTTL(d time.Duration) (time.Duration, error) {
+	if d > maxTTL {
+		return 0, errors.New("ttl too large")
+	}
+	if d <= 0 {
+		return 0, errors.New("ttl cannot be negative or zero")
+	}
+	return d, nil
 }
 
 func renderText(w http.ResponseWriter, path string, content []byte, style string) error {
