@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"crypto/subtle"
 	"errors"
 	"fmt"
@@ -63,22 +62,13 @@ func (s *Server) HandleUpload(w http.ResponseWriter, r *http.Request) {
 		}
 	}(r.Body)
 
-	head := make([]byte, 512)
-	n, err := r.Body.Read(head)
-	if err != nil && err != io.EOF && !errors.Is(err, io.ErrUnexpectedEOF) {
-		slog.Error("failed to read request header", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
 	contentType := r.Header.Get("Content-Type")
-	if contentType == "" || contentType == "application/octet-stream" {
-		contentType = http.DetectContentType(head[:n])
+	if contentType == "" {
+		contentType = "application/octet-stream"
 	}
 	ext := determineExtension(contentType, r.URL.Query().Get("lang"))
 
-	fullBody := io.MultiReader(bytes.NewReader(head[:n]), r.Body)
-	id, err := s.store.SaveFile(fullBody, ext)
+	id, err := s.store.SaveFile(r.Body, ext)
 	if err != nil {
 		slog.Error("failed to save file", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)

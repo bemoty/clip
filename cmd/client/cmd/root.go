@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -40,6 +41,7 @@ cat main.go | clip -l go`,
 				_ = f.Close()
 			}(f)
 			r = f
+			return upload(cmd, r, args[0])
 		case len(args) > 0 && args[0] == "-":
 			r = os.Stdin
 		default:
@@ -55,23 +57,27 @@ cat main.go | clip -l go`,
 			}
 		}
 
-		return upload(cmd, r)
+		return upload(cmd, r, "")
 	},
 }
 
-func upload(cmd *cobra.Command, r io.Reader) error {
-	head := make([]byte, 512)
-	n, err := r.Read(head)
-	if err != nil && err != io.EOF {
-		return err
+func upload(cmd *cobra.Command, r io.Reader, filename string) error {
+	contentType := "application/octet-stream"
+	if ext := filepath.Ext(filename); ext != "" {
+		if t := mime.TypeByExtension(ext); t != "" {
+			contentType = t
+		}
 	}
-	head = head[:n]
-
-	contentType := http.DetectContentType(head)
-	if contentType == "application/octet-stream" && looksLikeText(head) {
-		contentType = "text/plain; charset=utf-8"
+	if contentType == "application/octet-stream" {
+		head := make([]byte, 512)
+		n, _ := r.Read(head)
+		head = head[:n]
+		if looksLikeText(head) {
+			contentType = "text/plain; charset=utf-8"
+		}
+		r = io.MultiReader(bytes.NewReader(head), r)
 	}
-	body := io.MultiReader(bytes.NewReader(head), r)
+	body := r
 
 	serverURL := viper.GetString("url")
 	if serverURL == "" {
