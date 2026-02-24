@@ -86,7 +86,7 @@ func upload(cmd *cobra.Command, r io.Reader) error {
 	if lang, _ := cmd.Flags().GetString("lang"); lang != "" {
 		q.Set("lang", lang)
 	}
-	if ttl := viper.GetString("ttl"); ttl != "" {
+	if ttl, _ := cmd.Flags().GetString("ttl"); ttl != "" {
 		q.Set("ttl", ttl)
 	}
 	u.RawQuery = q.Encode()
