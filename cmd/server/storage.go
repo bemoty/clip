@@ -75,9 +75,6 @@ func (s *DiskStore) performCleanup() {
 		if err := s.DeleteFile(id); err != nil && !errors.Is(err, os.ErrNotExist) {
 			slog.Warn("sweep: failed to delete expired file", "id", id, "error", err)
 		}
-		if err := s.DeleteMeta(id); err != nil && !errors.Is(err, os.ErrNotExist) {
-			slog.Warn("sweep: failed to delete expired meta", "id", id, "error", err)
-		}
 		return nil
 	})
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -141,10 +138,14 @@ func (s *DiskStore) GetFile(id string) (string, bool) {
 func (s *DiskStore) DeleteFile(id string) error {
 	path, ok := s.GetFile(id)
 	if !ok {
+		_ = s.DeleteMeta(id)
 		return os.ErrNotExist
 	}
 	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
+	}
+	if err := s.DeleteMeta(id); err != nil {
+		slog.Warn("failed to clean up meta file", "id", id, "error", err)
 	}
 	dir := filepath.Dir(path)
 	_ = os.Remove(dir)

@@ -31,11 +31,17 @@ var langRegex = regexp.MustCompile(`^[a-z0-9]{1,20}$`)
 
 const maxTTL = 365 * 24 * time.Hour
 
-func (s *Server) HandleUpload(w http.ResponseWriter, r *http.Request) {
-	authHeader := r.Header.Get("Authorization")
-	expectedAuthHeader := "Bearer " + s.config.AuthKey
-	if subtle.ConstantTimeCompare([]byte(authHeader), []byte(expectedAuthHeader)) != 1 {
+func (s *Server) authorize(w http.ResponseWriter, r *http.Request) bool {
+	expected := "Bearer " + s.config.AuthKey
+	if subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte(expected)) != 1 {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return false
+	}
+	return true
+}
+
+func (s *Server) HandleUpload(w http.ResponseWriter, r *http.Request) {
+	if !s.authorize(w, r) {
 		return
 	}
 
@@ -93,18 +99,6 @@ func (s *Server) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	slog.Info("file uploaded", "id", id, "type", contentType, "url", fullURL)
 }
 
-func determineExtension(contentType, lang string) string {
-	if strings.HasPrefix(contentType, "text/") && langRegex.MatchString(lang) {
-		return "." + lang
-	}
-
-	exts, err := mime.ExtensionsByType(contentType)
-	if len(exts) == 0 || err != nil {
-		return ".bin"
-	}
-	return exts[0]
-}
-
 func (s *Server) HandleServe(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, "/")
 
@@ -123,15 +117,13 @@ func (s *Server) HandleServe(w http.ResponseWriter, r *http.Request) {
 
 	expiry, metaErr := s.store.GetMeta(id)
 	if metaErr != nil && !errors.Is(metaErr, os.ErrNotExist) {
+		slog.Error("failed to read file metadata", "id", id, "error", metaErr)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 	if metaErr == nil && time.Now().After(expiry) {
 		if err := s.store.DeleteFile(id); err != nil {
 			slog.Warn("failed to delete expired file", "id", id, "error", err)
-		}
-		if err := s.store.DeleteMeta(id); err != nil {
-			slog.Warn("failed to delete expired file metadata", "id", id, "error", err)
 		}
 		http.Error(w, "Gone", http.StatusGone)
 		return
@@ -155,6 +147,38 @@ func (s *Server) HandleServe(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", "inline; filename="+id+filepath.Ext(path))
 		http.ServeFile(w, r, path)
 	}
+}
+
+func (s *Server) HandleDelete(w http.ResponseWriter, r *http.Request) {
+	if !s.authorize(w, r) {
+		return
+	}
+
+	id := strings.TrimPrefix(r.URL.Path, "/")
+
+	if err := s.store.DeleteFile(id); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			http.NotFound(w, r)
+			return
+		}
+		slog.Error("failed to delete file", "id", id, "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func determineExtension(contentType, lang string) string {
+	if strings.HasPrefix(contentType, "text/") && langRegex.MatchString(lang) {
+		return "." + lang
+	}
+
+	exts, err := mime.ExtensionsByType(contentType)
+	if len(exts) == 0 || err != nil {
+		return ".bin"
+	}
+	return exts[0]
 }
 
 func parseTTL(s string) (time.Duration, error) {

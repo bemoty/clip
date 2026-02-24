@@ -25,6 +25,7 @@ func main() {
 
 	mux.HandleFunc("POST /", server.HandleUpload)
 	mux.HandleFunc("GET /{id}", server.HandleServe)
+	mux.HandleFunc("DELETE /{id}", server.HandleDelete)
 	mux.HandleFunc("GET /", http.NotFound)
 	mux.HandleFunc("GET /favicon.ico", http.NotFound)
 
