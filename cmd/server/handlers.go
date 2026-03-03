@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/subtle"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"mime"
@@ -27,8 +26,6 @@ type Server struct {
 }
 
 var langRegex = regexp.MustCompile(`^[a-z0-9]{1,20}$`)
-
-const maxTTL = 365 * 24 * time.Hour
 
 func (s *Server) authorize(w http.ResponseWriter, r *http.Request) bool {
 	if len(s.config.AuthKeys) == 1 && s.config.AuthKeys[0] == "no-auth" {
@@ -206,31 +203,6 @@ func determineExtension(contentType, lang string) string {
 	}
 
 	return ".bin"
-}
-
-func parseTTL(s string) (time.Duration, error) {
-	if strings.HasSuffix(s, "d") {
-		n, err := strconv.Atoi(strings.TrimSuffix(s, "d"))
-		if err != nil {
-			return 0, fmt.Errorf("invalid ttl %q", s)
-		}
-		return validateTTL(time.Duration(n) * 24 * time.Hour)
-	}
-	d, err := time.ParseDuration(s)
-	if err != nil {
-		return 0, err
-	}
-	return validateTTL(d)
-}
-
-func validateTTL(d time.Duration) (time.Duration, error) {
-	if d > maxTTL {
-		return 0, errors.New("ttl too large")
-	}
-	if d <= 0 {
-		return 0, errors.New("ttl cannot be negative or zero")
-	}
-	return d, nil
 }
 
 func isTextContent(path string) bool {
