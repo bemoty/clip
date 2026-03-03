@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -11,7 +12,7 @@ import (
 type Config struct {
 	Port          string
 	StoragePath   string
-	AuthKey       string
+	AuthKeys      []string
 	BaseURL       string
 	MaxFileMB     int64
 	MaxStorageMB  int64
@@ -21,6 +22,15 @@ type Config struct {
 }
 
 func NewConfig() (Config, error) {
+	authKeysStr := getEnv("AUTH_KEY", "no-auth")
+	authKeys := strings.Split(authKeysStr, ",")
+	for i, key := range authKeys {
+		authKeys[i] = strings.TrimSpace(key)
+	}
+	if slices.Contains(authKeys, "no-auth") && authKeysStr != "no-auth" {
+		return Config{}, fmt.Errorf("AUTH_KEY must not contain 'no-auth'")
+	}
+
 	maxFileMBStr := getEnv("MAX_FILE_MB", "100")
 	maxFileMB, err := strconv.ParseInt(maxFileMBStr, 10, 64)
 	if err != nil || maxFileMB <= 0 {
@@ -49,7 +59,7 @@ func NewConfig() (Config, error) {
 	return Config{
 		Port:          normalizeAddress(getEnv("PORT", ":8080")),
 		StoragePath:   getEnv("STORAGE_PATH", "./data"),
-		AuthKey:       getEnv("AUTH_KEY", "no-auth"),
+		AuthKeys:      authKeys,
 		BaseURL:       getEnv("BASE_URL", "https://i.bemoty.dev"),
 		MaxFileMB:     maxFileMB,
 		MaxStorageMB:  maxStorageMB,

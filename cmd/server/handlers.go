@@ -31,12 +31,21 @@ var langRegex = regexp.MustCompile(`^[a-z0-9]{1,20}$`)
 const maxTTL = 365 * 24 * time.Hour
 
 func (s *Server) authorize(w http.ResponseWriter, r *http.Request) bool {
-	expected := "Bearer " + s.config.AuthKey
-	if subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte(expected)) != 1 {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return false
+	if len(s.config.AuthKeys) == 1 && s.config.AuthKeys[0] == "no-auth" {
+		return true
 	}
-	return true
+
+	var match int
+	for _, authKey := range s.config.AuthKeys {
+		expected := "Bearer " + authKey
+		match |= subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte(expected))
+	}
+	if match == 1 {
+		return true
+	}
+
+	http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	return false
 }
 
 func (s *Server) HandleUpload(w http.ResponseWriter, r *http.Request) {

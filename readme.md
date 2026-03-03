@@ -156,7 +156,7 @@ docker build -t clip .
 |:-----------------|:-----------------------------------------------------------------------------------------------------------|:-----------------------|
 | `PORT`           | HTTP port to listen on                                                                                     | `:8080`                |
 | `STORAGE_PATH`   | Directory where files are stored                                                                           | `./data`               |
-| `AUTH_KEY`       | Secret key for upload auth                                                                                 | `no-auth`              |
+| `AUTH_KEY`       | Secret key for upload auth, also supports multiple comma-separated keys                                    | `no-auth`              |
 | `BASE_URL`       | Public URL used to generate links                                                                          | `https://i.bemoty.dev` |
 | `MAX_FILE_MB`    | Maximum file upload size in MB                                                                             | `100`                  |
 | `PASTE_STYLE`    | Chroma style for code pastes — [available styles](https://github.com/alecthomas/chroma/tree/master/styles) | `dracula`              |
