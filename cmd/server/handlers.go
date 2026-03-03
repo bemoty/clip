@@ -157,6 +157,7 @@ func (s *Server) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+	slog.Info("file deleted", "id", id)
 }
 
 func determineExtension(contentType, lang string) string {
