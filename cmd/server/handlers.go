@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/subtle"
 	"errors"
 	"io"
@@ -22,7 +23,7 @@ import (
 
 type Server struct {
 	config Config
-	store  *DiskStore
+	store  Store
 }
 
 var langRegex = regexp.MustCompile(`^[a-z0-9]{1,20}$`)
@@ -102,18 +103,14 @@ func (s *Server) HandleUpload(w http.ResponseWriter, r *http.Request) {
 func (s *Server) HandleServe(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, "/")
 
-	path, ok := s.store.GetFile(id)
+	reader, filename, ok := s.store.OpenFile(id)
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
-
-	absBaseDir, err := filepath.Abs(s.store.BaseDir)
-	absPath, err2 := filepath.Abs(path)
-	if err != nil || err2 != nil || !strings.HasPrefix(absPath, absBaseDir+string(filepath.Separator)) {
-		http.NotFound(w, r)
-		return
-	}
+	defer func(reader io.ReadCloser) {
+		_ = reader.Close()
+	}(reader)
 
 	expiry, metaErr := s.store.GetMeta(id)
 	if metaErr != nil && !errors.Is(metaErr, os.ErrNotExist) {
@@ -136,26 +133,37 @@ func (s *Server) HandleServe(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 
-	fileType := mime.TypeByExtension(filepath.Ext(path))
-	isText := strings.HasPrefix(fileType, "text/") || isTextContent(path)
+	head := make([]byte, 512)
+	n, _ := reader.Read(head)
+	head = head[:n]
+	fullReader := io.MultiReader(bytes.NewReader(head), reader)
+
+	fileType := mime.TypeByExtension(filepath.Ext(filename))
+	isText := strings.HasPrefix(fileType, "text/") || isTextContent(head)
 	if isText && strings.Contains(r.Header.Get("Accept"), "text/html") {
-		content, err := os.ReadFile(path)
+		content, err := io.ReadAll(fullReader)
 		if err != nil {
 			slog.Warn("failed to read file", "error", err)
 			http.NotFound(w, r)
 			return
 		}
-		if err := renderText(w, path, content, s.config.PasteStyle); err != nil {
+		if err := renderText(w, filename, content, s.config.PasteStyle); err != nil {
 			slog.Warn("failed to render text file", "error", err)
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-			http.ServeFile(w, r, path)
+			if _, copyErr := io.Copy(w, bytes.NewReader(content)); copyErr != nil {
+				slog.Warn("failed to write content", "error", copyErr)
+			}
 		}
 	} else {
-		w.Header().Set("Content-Disposition", "inline; filename="+id+filepath.Ext(path))
+		w.Header().Set("Content-Disposition", "inline; filename="+id+filepath.Ext(filename))
 		if isText {
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		} else if fileType != "" {
+			w.Header().Set("Content-Type", fileType)
 		}
-		http.ServeFile(w, r, path)
+		if _, err := io.Copy(w, fullReader); err != nil {
+			slog.Warn("failed to write file content", "error", err)
+		}
 	}
 }
 
@@ -205,22 +213,13 @@ func determineExtension(contentType, lang string) string {
 	return ".bin"
 }
 
-func isTextContent(path string) bool {
-	f, err := os.Open(path)
-	if err != nil {
-		return false
-	}
-	defer func(f *os.File) {
-		_ = f.Close()
-	}(f)
-	head := make([]byte, 512)
-	n, _ := f.Read(head)
-	for _, b := range head[:n] {
+func isTextContent(head []byte) bool {
+	for _, b := range head {
 		if b == 0 {
 			return false
 		}
 	}
-	return n > 0
+	return len(head) > 0
 }
 
 func renderText(w http.ResponseWriter, path string, content []byte, style string) error {

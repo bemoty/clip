@@ -17,6 +17,14 @@ import (
 
 var ErrStorageFull = errors.New("storage limit exceeded")
 
+type Store interface {
+	SaveFile(r io.Reader, ext string, contentLength int64) (string, error)
+	OpenFile(id string) (io.ReadCloser, string, bool)
+	DeleteFile(id string) error
+	GetMeta(id string) (time.Time, error)
+	WriteMeta(id string, expiry time.Duration) error
+}
+
 type DiskStore struct {
 	BaseDir      string
 	maxStorageMB int64
@@ -171,6 +179,23 @@ func (s *DiskStore) GetFile(id string) (string, bool) {
 	}
 
 	return matches[0], true
+}
+
+func (s *DiskStore) OpenFile(id string) (io.ReadCloser, string, bool) {
+	path, ok := s.GetFile(id)
+	if !ok {
+		return nil, "", false
+	}
+	absBase, err := filepath.Abs(s.BaseDir)
+	absPath, err2 := filepath.Abs(path)
+	if err != nil || err2 != nil || !strings.HasPrefix(absPath, absBase+string(filepath.Separator)) {
+		return nil, "", false
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, "", false
+	}
+	return f, filepath.Base(path), true
 }
 
 func (s *DiskStore) DeleteFile(id string) error {
