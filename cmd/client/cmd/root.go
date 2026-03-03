@@ -13,8 +13,10 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/atotto/clipboard"
+	"github.com/bemoty/clip/cmd/client/history"
 	"github.com/gen2brain/beeep"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -32,6 +34,7 @@ cat main.go | clip -l go`,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var r io.Reader
+		var filename, source string
 
 		switch {
 		case len(args) > 0 && args[0] != "-":
@@ -43,27 +46,31 @@ cat main.go | clip -l go`,
 				_ = f.Close()
 			}(f)
 			r = f
-			return upload(cmd, r, args[0])
+			filename = args[0]
+			source = filepath.Base(args[0])
 		case len(args) > 0 && args[0] == "-":
 			r = os.Stdin
+			source = "stdin"
 		default:
 			stat, _ := os.Stdin.Stat()
 			if (stat.Mode() & os.ModeCharDevice) == 0 {
 				r = os.Stdin
+				source = "stdin"
 			} else {
 				text, err := clipboard.ReadAll()
 				if err != nil {
 					return err
 				}
 				r = strings.NewReader(text)
+				source = "clipboard"
 			}
 		}
 
-		return upload(cmd, r, "")
+		return upload(cmd, r, filename, source)
 	},
 }
 
-func upload(cmd *cobra.Command, r io.Reader, filename string) error {
+func upload(cmd *cobra.Command, r io.Reader, filename, source string) error {
 	contentType := "application/octet-stream"
 	if ext := filepath.Ext(filename); ext != "" {
 		if t := mime.TypeByExtension(ext); t != "" {
@@ -127,6 +134,18 @@ func upload(cmd *cobra.Command, r io.Reader, filename string) error {
 	}
 	uploadedURL := strings.TrimSpace(string(resBody))
 	fmt.Println(uploadedURL)
+
+	if viper.GetBool("history") {
+		ttl, _ := cmd.Flags().GetString("ttl")
+		if err := history.Append(history.Entry{
+			Ts:     time.Now().UTC(),
+			URL:    uploadedURL,
+			Source: source,
+			TTL:    ttl,
+		}); err != nil {
+			_, _ = fmt.Fprintln(os.Stderr, "warning: could not write history:", err)
+		}
+	}
 
 	if cp, _ := cmd.Flags().GetBool("copy"); cp {
 		if err := clipboard.WriteAll(uploadedURL); err != nil {
@@ -206,9 +225,10 @@ func initConfig() {
 		panic(err)
 	}
 
+	viper.SetDefault("history", true)
+
 	if err := viper.ReadInConfig(); err != nil {
-		var notFound viper.ConfigFileNotFoundError
-		if !errors.As(err, &notFound) {
+		if _, ok := errors.AsType[viper.ConfigFileNotFoundError](err); !ok {
 			_, _ = fmt.Fprintln(os.Stderr, "could not read config:", err)
 			os.Exit(1)
 		}
