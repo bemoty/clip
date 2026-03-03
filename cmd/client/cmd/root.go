@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/atotto/clipboard"
@@ -135,6 +137,22 @@ func upload(cmd *cobra.Command, r io.Reader, filename string) error {
 			return err
 		}
 	}
+
+	if open, _ := cmd.Flags().GetBool("open"); open {
+		var c *exec.Cmd
+		switch runtime.GOOS {
+		case "linux":
+			c = exec.Command("xdg-open", uploadedURL)
+		case "darwin":
+			c = exec.Command("open", uploadedURL)
+		case "windows":
+			c = exec.Command("cmd", "/c", "start", uploadedURL)
+		}
+		if c != nil {
+			_ = c.Start()
+		}
+	}
+
 	return nil
 }
 
@@ -164,6 +182,7 @@ func init() {
 	RootCmd.Flags().StringP("lang", "l", "", "Programming language of the uploaded code (only has effect for text upload)")
 	RootCmd.Flags().String("ttl", "", "Time to live of the uploaded file")
 	RootCmd.Flags().BoolP("copy", "c", false, "Copies the shareable link to clipboard and outputs a notification")
+	RootCmd.Flags().BoolP("open", "o", false, "Opens the shareable link in the default browser")
 }
 
 func initConfig() {

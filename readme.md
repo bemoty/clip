@@ -63,6 +63,7 @@ clip -                      # explicitly read from stdin
 | `--lang` | `-l`  | Language hint for syntax highlighting           |
 | `--ttl`  |       | Time to live (e.g. `7d`, `1h`)                  |
 | `--copy` | `-c`  | Immediately copy the returned link to clipboard |
+| `--open` | `-o`  | Open the returned link in the default browser   |
 
 ### KDE Dolphin integration
 
