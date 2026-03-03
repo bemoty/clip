@@ -171,10 +171,19 @@ func determineExtension(contentType, lang string) string {
 	}
 
 	exts, err := mime.ExtensionsByType(contentType)
-	if len(exts) == 0 || err != nil {
-		return ".bin"
+	if err == nil && len(exts) > 0 {
+		return exts[0]
 	}
-	return exts[0]
+
+	if lexer := lexers.MatchMimeType(contentType); lexer != nil {
+		for _, filename := range lexer.Config().Filenames {
+			if ext := filepath.Ext(filename); ext != "" {
+				return ext
+			}
+		}
+	}
+
+	return ".bin"
 }
 
 func parseTTL(s string) (time.Duration, error) {
