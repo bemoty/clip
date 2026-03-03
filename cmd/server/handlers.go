@@ -122,7 +122,8 @@ func (s *Server) HandleServe(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 
 	fileType := mime.TypeByExtension(filepath.Ext(path))
-	if strings.HasPrefix(fileType, "text/") && strings.Contains(r.Header.Get("Accept"), "text/html") {
+	isText := strings.HasPrefix(fileType, "text/") || isTextContent(path)
+	if isText && strings.Contains(r.Header.Get("Accept"), "text/html") {
 		content, err := os.ReadFile(path)
 		if err != nil {
 			slog.Warn("failed to read file", "error", err)
@@ -131,10 +132,14 @@ func (s *Server) HandleServe(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := renderText(w, path, content, s.config.PasteStyle); err != nil {
 			slog.Warn("failed to render text file", "error", err)
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 			http.ServeFile(w, r, path)
 		}
 	} else {
 		w.Header().Set("Content-Disposition", "inline; filename="+id+filepath.Ext(path))
+		if isText {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		}
 		http.ServeFile(w, r, path)
 	}
 }
@@ -195,6 +200,22 @@ func validateTTL(d time.Duration) (time.Duration, error) {
 		return 0, errors.New("ttl cannot be negative or zero")
 	}
 	return d, nil
+}
+
+func isTextContent(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	head := make([]byte, 512)
+	n, _ := f.Read(head)
+	for _, b := range head[:n] {
+		if b == 0 {
+			return false
+		}
+	}
+	return n > 0
 }
 
 func renderText(w http.ResponseWriter, path string, content []byte, style string) error {
