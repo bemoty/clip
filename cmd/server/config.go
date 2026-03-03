@@ -14,6 +14,7 @@ type Config struct {
 	AuthKey       string
 	BaseURL       string
 	MaxFileMB     int64
+	MaxStorageMB  int64
 	PasteStyle    string
 	DefaultTTL    time.Duration
 	SweepInterval time.Duration
@@ -24,6 +25,12 @@ func NewConfig() (Config, error) {
 	maxFileMB, err := strconv.ParseInt(maxFileMBStr, 10, 64)
 	if err != nil || maxFileMB <= 0 {
 		return Config{}, fmt.Errorf("MAX_FILE_MB must be a positive integer, got %q", maxFileMBStr)
+	}
+
+	maxStorageMBStr := getEnv("MAX_STORAGE_MB", "0")
+	maxStorageMB, err := strconv.ParseInt(maxStorageMBStr, 10, 64)
+	if err != nil || maxStorageMB < 0 {
+		return Config{}, fmt.Errorf("MAX_STORAGE_MB must be a non-negative integer, got %q", maxStorageMBStr)
 	}
 
 	sweepInterval, err := time.ParseDuration(getEnv("SWEEP_INTERVAL", "1h"))
@@ -45,6 +52,7 @@ func NewConfig() (Config, error) {
 		AuthKey:       getEnv("AUTH_KEY", "no-auth"),
 		BaseURL:       getEnv("BASE_URL", "https://i.bemoty.dev"),
 		MaxFileMB:     maxFileMB,
+		MaxStorageMB:  maxStorageMB,
 		PasteStyle:    getEnv("PASTE_STYLE", "dracula"),
 		DefaultTTL:    defaultTTL,
 		SweepInterval: sweepInterval,

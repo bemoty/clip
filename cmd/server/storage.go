@@ -11,18 +11,23 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
+var ErrStorageFull = errors.New("storage limit exceeded")
+
 type DiskStore struct {
-	BaseDir string
+	BaseDir      string
+	maxStorageMB int64
+	mu           sync.Mutex
 }
 
 // IdByteLength must not be less than 3, or the sharding logic will panic (minimum 5 for sensible file names)
 const IdByteLength = 6
 
 func NewDiskStore(ctx context.Context, config Config) *DiskStore {
-	store := &DiskStore{BaseDir: config.StoragePath}
+	store := &DiskStore{BaseDir: config.StoragePath, maxStorageMB: config.MaxStorageMB}
 	go store.sweep(ctx, config.SweepInterval)
 	return store
 }
@@ -82,7 +87,40 @@ func (s *DiskStore) performCleanup() {
 	}
 }
 
-func (s *DiskStore) SaveFile(r io.Reader, ext string) (string, error) {
+func (s *DiskStore) usedSpace() (int64, error) {
+	size := int64(0)
+	err := filepath.WalkDir(s.BaseDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || strings.HasPrefix(path, filepath.Join(s.BaseDir, ".meta")) {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		size += info.Size()
+		return nil
+	})
+	return size, err
+}
+
+func (s *DiskStore) SaveFile(r io.Reader, ext string, contentLength int64) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.maxStorageMB > 0 {
+		used, err := s.usedSpace()
+		if err != nil {
+			return "", err
+		}
+		limit := s.maxStorageMB << 20
+		if used >= limit || (contentLength >= 0 && used+contentLength > limit) {
+			return "", ErrStorageFull
+		}
+	}
+
 	for {
 		id, err := generateId(IdByteLength)
 		if err != nil {

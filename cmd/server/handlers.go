@@ -68,8 +68,12 @@ func (s *Server) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	ext := determineExtension(contentType, r.URL.Query().Get("lang"))
 
-	id, err := s.store.SaveFile(r.Body, ext)
+	id, err := s.store.SaveFile(r.Body, ext, r.ContentLength)
 	if err != nil {
+		if errors.Is(err, ErrStorageFull) {
+			http.Error(w, "Storage limit exceeded", http.StatusInsufficientStorage)
+			return
+		}
 		slog.Error("failed to save file", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
@@ -165,7 +169,7 @@ func (s *Server) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	slog.Info("file deleted", "id", id)
 }
 
-func (s *Server) HandleHealth(w http.ResponseWriter, r *http.Request) {
+func (s *Server) HandleHealth(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 

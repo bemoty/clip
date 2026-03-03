@@ -162,6 +162,7 @@ docker build -t clip .
 | `PASTE_STYLE`    | Chroma style for code pastes — [available styles](https://github.com/alecthomas/chroma/tree/master/styles) | `dracula`              |
 | `DEFAULT_TTL`    | The default time to live for uploads                                                                       |                        |
 | `SWEEP_INTERVAL` | Interval duration between file cleanup sweeps for uploads with TTL                                         | `1h`                   |
+| `MAX_STORAGE_MB` | Maximum storage size in MB (0 means no limit)                                                              | `0`                    |
 
 ## License
 
