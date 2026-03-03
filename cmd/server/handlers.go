@@ -115,12 +115,17 @@ func (s *Server) HandleServe(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
-	if metaErr == nil && time.Now().After(expiry) {
-		if err := s.store.DeleteFile(id); err != nil {
-			slog.Warn("failed to delete expired file", "id", id, "error", err)
+	if metaErr == nil {
+		now := time.Now()
+		if now.After(expiry) {
+			if err := s.store.DeleteFile(id); err != nil {
+				slog.Warn("failed to delete expired file", "id", id, "error", err)
+			}
+			http.Error(w, "Gone", http.StatusGone)
+			return
 		}
-		http.Error(w, "Gone", http.StatusGone)
-		return
+		w.Header().Set("Expires", expiry.UTC().Format(http.TimeFormat))
+		w.Header().Set("Cache-Control", "max-age="+strconv.FormatInt(int64(expiry.Sub(now)/time.Second), 10))
 	}
 
 	w.Header().Set("X-Content-Type-Options", "nosniff")
