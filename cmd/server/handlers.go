@@ -165,6 +165,10 @@ func (s *Server) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	slog.Info("file deleted", "id", id)
 }
 
+func (s *Server) HandleHealth(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+}
+
 func determineExtension(contentType, lang string) string {
 	if strings.HasPrefix(contentType, "text/") && langRegex.MatchString(lang) {
 		return "." + lang
@@ -216,7 +220,9 @@ func isTextContent(path string) bool {
 	if err != nil {
 		return false
 	}
-	defer f.Close()
+	defer func(f *os.File) {
+		_ = f.Close()
+	}(f)
 	head := make([]byte, 512)
 	n, _ := f.Read(head)
 	for _, b := range head[:n] {
