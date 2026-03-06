@@ -20,6 +20,7 @@ import (
 	"github.com/gen2brain/beeep"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/term"
 )
 
 var RootCmd = &cobra.Command{
@@ -35,6 +36,7 @@ cat main.go | clip -l go`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var r io.Reader
 		var filename, source string
+		var size int64 = -1
 
 		switch {
 		case len(args) > 0 && args[0] != "-":
@@ -45,6 +47,9 @@ cat main.go | clip -l go`,
 			defer func(f *os.File) {
 				_ = f.Close()
 			}(f)
+			if info, err := f.Stat(); err == nil {
+				size = info.Size()
+			}
 			r = f
 			filename = args[0]
 			source = filepath.Base(args[0])
@@ -52,8 +57,7 @@ cat main.go | clip -l go`,
 			r = os.Stdin
 			source = "stdin"
 		default:
-			stat, _ := os.Stdin.Stat()
-			if (stat.Mode() & os.ModeCharDevice) == 0 {
+			if !term.IsTerminal(int(os.Stdin.Fd())) {
 				r = os.Stdin
 				source = "stdin"
 			} else {
@@ -61,16 +65,17 @@ cat main.go | clip -l go`,
 				if err != nil {
 					return err
 				}
+				size = int64(len(text))
 				r = strings.NewReader(text)
 				source = "clipboard"
 			}
 		}
 
-		return upload(cmd, r, filename, source)
+		return upload(cmd, r, filename, source, size)
 	},
 }
 
-func upload(cmd *cobra.Command, r io.Reader, filename, source string) error {
+func upload(cmd *cobra.Command, r io.Reader, filename, source string, size int64) error {
 	contentType := "application/octet-stream"
 	if ext := filepath.Ext(filename); ext != "" {
 		if t := mime.TypeByExtension(ext); t != "" {
@@ -86,7 +91,9 @@ func upload(cmd *cobra.Command, r io.Reader, filename, source string) error {
 		}
 		r = io.MultiReader(bytes.NewReader(head), r)
 	}
-	body := r
+	pr := NewProgressReader(r, size)
+	defer pr.Done()
+	body := pr
 
 	serverURL := viper.GetString("url")
 	if serverURL == "" {
@@ -133,6 +140,7 @@ func upload(cmd *cobra.Command, r io.Reader, filename, source string) error {
 		return err
 	}
 	uploadedURL := strings.TrimSpace(string(resBody))
+	pr.Done()
 	fmt.Println(uploadedURL)
 
 	if viper.GetBool("history") {
