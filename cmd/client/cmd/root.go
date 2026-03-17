@@ -88,6 +88,8 @@ func upload(cmd *cobra.Command, r io.Reader, filename, source string, size int64
 		head = head[:n]
 		if looksLikeText(head) {
 			contentType = "text/plain; charset=utf-8"
+		} else {
+			contentType = http.DetectContentType(head)
 		}
 		r = io.MultiReader(bytes.NewReader(head), r)
 	}
