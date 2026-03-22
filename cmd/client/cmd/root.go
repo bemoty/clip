@@ -23,6 +23,15 @@ import (
 	"golang.org/x/term"
 )
 
+type uploadOpts struct {
+	lang     string
+	ttl      string
+	copy     bool
+	open     bool
+	source   string
+	mimeType string // non-empty overrides detection
+}
+
 var RootCmd = &cobra.Command{
 	Use:   binaryName,
 	Short: "Upload your clipboard for sharing",
@@ -35,8 +44,14 @@ cat main.go | clip -l go`,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var r io.Reader
-		var filename, source string
+		var filename string
 		var size int64 = -1
+
+		opts := uploadOpts{}
+		opts.lang, _ = cmd.Flags().GetString("lang")
+		opts.ttl, _ = cmd.Flags().GetString("ttl")
+		opts.copy, _ = cmd.Flags().GetBool("copy")
+		opts.open, _ = cmd.Flags().GetBool("open")
 
 		switch {
 		case len(args) > 0 && args[0] != "-":
@@ -52,14 +67,14 @@ cat main.go | clip -l go`,
 			}
 			r = f
 			filename = args[0]
-			source = filepath.Base(args[0])
+			opts.source = filepath.Base(args[0])
 		case len(args) > 0 && args[0] == "-":
 			r = os.Stdin
-			source = "stdin"
+			opts.source = "stdin"
 		default:
 			if !term.IsTerminal(int(os.Stdin.Fd())) {
 				r = os.Stdin
-				source = "stdin"
+				opts.source = "stdin"
 			} else {
 				text, err := clipboard.ReadAll()
 				if err != nil {
@@ -67,35 +82,26 @@ cat main.go | clip -l go`,
 				}
 				size = int64(len(text))
 				r = strings.NewReader(text)
-				source = "clipboard"
+				opts.source = "clipboard"
 			}
 		}
 
-		return upload(cmd, r, filename, source, size)
+		return upload(r, filename, size, opts)
 	},
 }
 
-func upload(cmd *cobra.Command, r io.Reader, filename, source string, size int64) error {
-	contentType := "application/octet-stream"
-	if ext := filepath.Ext(filename); ext != "" {
-		if t := mime.TypeByExtension(ext); t != "" {
-			contentType = t
+func upload(r io.Reader, filename string, size int64, opts uploadOpts) error {
+	contentType := opts.mimeType
+	if contentType == "" {
+		var err error
+		contentType, r, err = detectContentType(r, filename)
+		if err != nil {
+			return err
 		}
 	}
-	if contentType == "application/octet-stream" {
-		head := make([]byte, 512)
-		n, _ := r.Read(head)
-		head = head[:n]
-		if looksLikeText(head) {
-			contentType = "text/plain; charset=utf-8"
-		} else {
-			contentType = http.DetectContentType(head)
-		}
-		r = io.MultiReader(bytes.NewReader(head), r)
-	}
+
 	pr := NewProgressReader(r, size)
 	defer pr.Done()
-	body := pr
 
 	serverURL := viper.GetString("url")
 	if serverURL == "" {
@@ -107,15 +113,15 @@ func upload(cmd *cobra.Command, r io.Reader, filename, source string, size int64
 	}
 
 	q := u.Query()
-	if lang, _ := cmd.Flags().GetString("lang"); lang != "" {
-		q.Set("lang", lang)
+	if opts.lang != "" {
+		q.Set("lang", opts.lang)
 	}
-	if ttl, _ := cmd.Flags().GetString("ttl"); ttl != "" {
-		q.Set("ttl", ttl)
+	if opts.ttl != "" {
+		q.Set("ttl", opts.ttl)
 	}
 	u.RawQuery = q.Encode()
 
-	req, err := http.NewRequest(http.MethodPost, u.String(), body)
+	req, err := http.NewRequest(http.MethodPost, u.String(), pr)
 	if err != nil {
 		return err
 	}
@@ -146,28 +152,26 @@ func upload(cmd *cobra.Command, r io.Reader, filename, source string, size int64
 	fmt.Println(uploadedURL)
 
 	if viper.GetBool("history") {
-		ttl, _ := cmd.Flags().GetString("ttl")
 		if err := history.Append(history.Entry{
 			Ts:     time.Now().UTC(),
 			URL:    uploadedURL,
-			Source: source,
-			TTL:    ttl,
+			Source: opts.source,
+			TTL:    opts.ttl,
 		}); err != nil {
 			_, _ = fmt.Fprintln(os.Stderr, "warning: could not write history:", err)
 		}
 	}
 
-	if cp, _ := cmd.Flags().GetBool("copy"); cp {
+	if opts.copy {
 		if err := clipboard.WriteAll(uploadedURL); err != nil {
 			return err
 		}
-		err := beeep.Notify(binaryName, "Link copied to clipboard", "")
-		if err != nil {
+		if err := beeep.Notify(binaryName, "Link copied to clipboard", ""); err != nil {
 			return err
 		}
 	}
 
-	if open, _ := cmd.Flags().GetBool("open"); open {
+	if opts.open {
 		var c *exec.Cmd
 		switch runtime.GOOS {
 		case "linux":
@@ -183,6 +187,32 @@ func upload(cmd *cobra.Command, r io.Reader, filename, source string, size int64
 	}
 
 	return nil
+}
+
+func detectContentType(r io.Reader, filename string) (string, io.Reader, error) {
+	contentType := "application/octet-stream"
+	if ext := filepath.Ext(filename); ext != "" {
+		if t := mime.TypeByExtension(ext); t != "" {
+			contentType = t
+		}
+	}
+	if contentType != "application/octet-stream" {
+		return contentType, r, nil
+	}
+
+	head := make([]byte, 512)
+	n, err := r.Read(head)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return "", nil, err
+	}
+	head = head[:n]
+
+	if looksLikeText(head) {
+		contentType = "text/plain; charset=utf-8"
+	} else {
+		contentType = http.DetectContentType(head)
+	}
+	return contentType, io.MultiReader(bytes.NewReader(head), r), nil
 }
 
 func looksLikeText(data []byte) bool {
