@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/atotto/clipboard"
 	"github.com/bemoty/clip/cmd/client/history"
 	"github.com/gen2brain/beeep"
 	"github.com/spf13/cobra"
@@ -76,13 +75,14 @@ cat main.go | clip -l go`,
 				r = os.Stdin
 				opts.source = "stdin"
 			} else {
-				text, err := clipboard.ReadAll()
+				data, mimeType, err := readClipboard()
 				if err != nil {
 					return err
 				}
-				size = int64(len(text))
-				r = strings.NewReader(text)
+				size = int64(len(data))
+				r = bytes.NewReader(data)
 				opts.source = "clipboard"
+				opts.mimeType = mimeType
 			}
 		}
 
@@ -163,7 +163,7 @@ func upload(r io.Reader, filename string, size int64, opts uploadOpts) error {
 	}
 
 	if opts.copy {
-		if err := clipboard.WriteAll(uploadedURL); err != nil {
+		if err := writeClipboard(uploadedURL); err != nil {
 			return err
 		}
 		if err := beeep.Notify(binaryName, "Link copied to clipboard", ""); err != nil {

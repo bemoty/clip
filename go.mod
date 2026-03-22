@@ -4,7 +4,6 @@ go 1.26.0
 
 require (
 	github.com/alecthomas/chroma v0.10.0
-	github.com/atotto/clipboard v0.1.4
 	github.com/gen2brain/beeep v0.11.2
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
