@@ -19,7 +19,6 @@ import (
 	"github.com/gen2brain/beeep"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"golang.org/x/term"
 )
 
 type uploadOpts struct {
@@ -71,7 +70,7 @@ cat main.go | clip -l go`,
 			r = os.Stdin
 			opts.source = "stdin"
 		default:
-			if !term.IsTerminal(int(os.Stdin.Fd())) {
+			if stdinHasData() {
 				r = os.Stdin
 				opts.source = "stdin"
 			} else {
@@ -213,6 +212,19 @@ func detectContentType(r io.Reader, filename string) (string, io.Reader, error) 
 		contentType = http.DetectContentType(head)
 	}
 	return contentType, io.MultiReader(bytes.NewReader(head), r), nil
+}
+
+// stdinHasData reports whether stdin is a pipe or regular file (i.e., has data
+// to read), as opposed to a TTY or a null/empty fd from a non-interactive
+// launcher like a desktop shortcut.
+func stdinHasData() bool {
+	fi, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	mode := fi.Mode()
+	// named pipe (|) or regular file redirected in
+	return mode&os.ModeNamedPipe != 0 || mode.IsRegular()
 }
 
 func looksLikeText(data []byte) bool {
