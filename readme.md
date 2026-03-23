@@ -65,6 +65,41 @@ clip -                      # explicitly read from stdin
 | `--copy` | `-c`  | Immediately copy the returned link to clipboard |
 | `--open` | `-o`  | Open the returned link in the default browser   |
 
+### Clipboard support
+
+When run with no arguments, clip reads from the clipboard. Supported content varies by platform:
+
+| Platform      | Text | Images | Copied files    |
+|:--------------|:-----|:-------|:----------------|
+| Linux Wayland | yes  | yes    | yes (single)    |
+| Linux X11     | yes  | yes    | yes (single)    |
+| Windows       | yes  | yes    | yes (single)    |
+| macOS         | yes  | no     | no              |
+
+**Linux** requires an external clipboard tool to be installed:
+
+- Wayland: `wl-clipboard`
+
+  ```sh
+  # Arch
+  sudo pacman -S wl-clipboard
+  # Debian/Ubuntu
+  sudo apt install wl-clipboard
+  ```
+
+- X11: `xclip`
+
+  ```sh
+  # Arch
+  sudo pacman -S xclip
+  # Debian/Ubuntu
+  sudo apt install xclip
+  ```
+
+The correct tool is selected automatically based on the `WAYLAND_DISPLAY` and `XDG_SESSION_TYPE` environment variables.
+
+**macOS** binary clipboard data (images) is not supported without CGo, which is outside the scope of this project.
+
 ### KDE Dolphin integration
 
 If you are using KDE Plasma or KDE Dolphin, you can use the `clip` command as a right-click action in Dolphin to quickly
