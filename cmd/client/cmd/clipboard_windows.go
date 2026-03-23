@@ -25,6 +25,7 @@ var (
 )
 
 const (
+	cfHdrop       = 15     // HDROP (file URIs) clipboard format (CF_HDROP)
 	cfUnicodeText = 13     // UTF-16 clipboard format (CF_UNICODETEXT)
 	gmemMoveable  = 0x0002 // SetClipboardData() requires a GMEM_MOVEABLE memory object
 )
@@ -45,6 +46,42 @@ func waitOpenClipboard() error {
 	return fmt.Errorf("OpenClipboard: %w", err)
 }
 
+// parseCFHDrop reads the file paths out of a locked CF_HDROP memory block.
+// The DROPFILES header is 20 bytes: pFiles uint32, pt [2]int32, fNC uint32, fWide uint32.
+// fWide=1 means UTF-16 paths; fWide=0 means ANSI paths.
+// The path list starts at pFiles and is double-null terminated.
+func parseCFHDrop(p uintptr) []string {
+	pFiles := *(*uint32)(unsafe.Pointer(p))
+	fWide := *(*uint32)(unsafe.Pointer(p + 16))
+	cur := p + uintptr(pFiles)
+
+	var paths []string
+	for {
+		if fWide != 0 {
+			s := syscall.UTF16ToString((*[1 << 15]uint16)(unsafe.Pointer(cur))[:])
+			if s == "" {
+				break
+			}
+			paths = append(paths, s)
+			cur += uintptr(len(s)+1) * 2
+		} else {
+			b := (*[1 << 15]byte)(unsafe.Pointer(cur))[:]
+			var n int
+			// ANSI paths are null-terminated
+			for n < len(b) && b[n] != 0 {
+				n++
+			}
+			// Second null terminator marks end of list
+			if n == 0 {
+				break
+			}
+			paths = append(paths, string(b[:n]))
+			cur += uintptr(n + 1)
+		}
+	}
+	return paths
+}
+
 func readClipboard() ([]byte, string, error) {
 	// OpenClipboard and CloseClipboard must run on the same OS thread.
 	runtime.LockOSThread()
@@ -54,6 +91,20 @@ func readClipboard() ([]byte, string, error) {
 		return nil, "", err
 	}
 	defer procCloseClipboard.Call()
+
+	if c, _, _ := procGetClipboardData.Call(cfHdrop); c != 0 {
+		p, _, err := procGlobalLock.Call(c)
+		if p == 0 {
+			return nil, "", fmt.Errorf("GlobalLock: %w", err)
+		}
+		paths := parseCFHDrop(p)
+		procGlobalUnlock.Call(c)
+		data, err := resolveFile(paths)
+		if err != nil {
+			return nil, "", err
+		}
+		return data, "", nil
+	}
 
 	h, _, _ := procGetClipboardData.Call(cfUnicodeText)
 	if h == 0 {

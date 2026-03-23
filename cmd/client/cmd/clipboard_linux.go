@@ -115,6 +115,20 @@ func readClipboard() ([]byte, string, error) {
 	if len(data) == 0 {
 		return nil, "", fmt.Errorf("clipboard is empty, nothing to upload")
 	}
+	if mimeType == "text/uri-list" {
+		var uris []string
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" && !strings.HasPrefix(line, "#") {
+				uris = append(uris, line)
+			}
+		}
+		data, err = resolveFile(uris)
+		if err != nil {
+			return nil, "", err
+		}
+		return data, "", nil
+	}
 	return data, mimeType, nil
 }
 
