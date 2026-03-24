@@ -152,12 +152,12 @@ Configuration can also be provided via environment variables: `CLIP_URL`, `CLIP_
 
 ### Deployment
 
-Run via Docker Compose using the GitHub Container Registry image.
+Run via Docker Compose using the GitHub Container Registry image (`ghcr.io/bemoty/clip`).
 
 ```yaml
 services:
   clip:
-    image: docker.pkg.github.com/bemoty/clip/app:latest
+    image: ghcr.io/bemoty/clip:latest
     container_name: clip
     restart: unless-stopped
     ports:
