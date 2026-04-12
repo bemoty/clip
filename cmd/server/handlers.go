@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -147,6 +148,10 @@ func (s *Server) HandleServe(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
+		if isRedirectableURL(string(content)) {
+			http.Redirect(w, r, string(content), http.StatusFound)
+			return
+		}
 		if err := renderText(w, filename, content, s.config.PasteStyle); err != nil {
 			slog.Warn("failed to render text file", "error", err)
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -220,6 +225,17 @@ func isTextContent(head []byte) bool {
 		}
 	}
 	return len(head) > 0
+}
+
+func isRedirectableURL(input string) bool {
+	u, err := url.Parse(input)
+	if err != nil {
+		return false
+	}
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return false
+	}
+	return u.Host != ""
 }
 
 func renderText(w http.ResponseWriter, path string, content []byte, style string) error {
