@@ -12,14 +12,15 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/alecthomas/chroma"
-	"github.com/alecthomas/chroma/formatters/html"
-	"github.com/alecthomas/chroma/lexers"
-	"github.com/alecthomas/chroma/styles"
+	"github.com/alecthomas/chroma/v2"
+	"github.com/alecthomas/chroma/v2/formatters/html"
+	"github.com/alecthomas/chroma/v2/lexers"
+	"github.com/alecthomas/chroma/v2/styles"
 )
 
 type Server struct {
@@ -219,10 +220,8 @@ func determineExtension(contentType, lang string) string {
 }
 
 func isTextContent(head []byte) bool {
-	for _, b := range head {
-		if b == 0 {
-			return false
-		}
+	if slices.Contains(head, 0) {
+		return false
 	}
 	return len(head) > 0
 }

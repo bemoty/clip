@@ -73,8 +73,8 @@ func NewConfig() (Config, error) {
 const maxTTL = 365 * 24 * time.Hour
 
 func parseTTL(s string) (time.Duration, error) {
-	if strings.HasSuffix(s, "d") {
-		n, err := strconv.Atoi(strings.TrimSuffix(s, "d"))
+	if before, ok := strings.CutSuffix(s, "d"); ok {
+		n, err := strconv.Atoi(before)
 		if err != nil {
 			return 0, fmt.Errorf("invalid ttl %q", s)
 		}

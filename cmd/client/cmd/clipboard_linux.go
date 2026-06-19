@@ -39,7 +39,7 @@ func listMIMETypes() ([]string, error) {
 	}
 
 	var types []string
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
 		t := strings.TrimSpace(line)
 		// Filter X11 atoms that are not MIME types (e.g., TARGETS, TIMESTAMP, UTF8_STRING)
 		if t != "" && strings.Contains(t, "/") {
@@ -117,7 +117,7 @@ func readClipboard() ([]byte, string, error) {
 	}
 	if mimeType == "text/uri-list" {
 		var uris []string
-		for _, line := range strings.Split(string(data), "\n") {
+		for line := range strings.SplitSeq(string(data), "\n") {
 			line = strings.TrimSpace(line)
 			if line != "" && !strings.HasPrefix(line, "#") {
 				uris = append(uris, line)

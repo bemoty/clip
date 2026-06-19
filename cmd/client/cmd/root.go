@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -228,12 +229,7 @@ func stdinHasData() bool {
 }
 
 func looksLikeText(data []byte) bool {
-	for _, b := range data {
-		if b == 0 {
-			return false
-		}
-	}
-	return true
+	return !slices.Contains(data, 0)
 }
 
 func Execute() {

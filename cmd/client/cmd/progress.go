@@ -55,10 +55,7 @@ func (pr *ProgressReader) Render() {
 	var line string
 	if pr.size > 0 {
 		pct := float64(pr.read) / float64(pr.size) * 100
-		filled := int(pct / 100 * barWidth)
-		if filled > barWidth {
-			filled = barWidth
-		}
+		filled := min(int(pct/100*barWidth), barWidth)
 		bar := strings.Repeat("#", filled)
 		if filled < barWidth {
 			bar += strings.Repeat(" ", barWidth-filled-1)
