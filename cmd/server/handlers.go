@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -141,7 +140,10 @@ func (s *Server) HandleServe(w http.ResponseWriter, r *http.Request) {
 	fullReader := io.MultiReader(bytes.NewReader(head), reader)
 
 	fileType := mime.TypeByExtension(filepath.Ext(filename))
-	isText := strings.HasPrefix(fileType, "text/") || isTextContent(head)
+	if fileType == "" {
+		fileType = http.DetectContentType(head)
+	}
+	isText := strings.HasPrefix(fileType, "text/")
 	if isText && strings.Contains(r.Header.Get("Accept"), "text/html") {
 		content, err := io.ReadAll(fullReader)
 		if err != nil {
@@ -217,13 +219,6 @@ func determineExtension(contentType, lang string) string {
 	}
 
 	return ".bin"
-}
-
-func isTextContent(head []byte) bool {
-	if slices.Contains(head, 0) {
-		return false
-	}
-	return len(head) > 0
 }
 
 func isRedirectableURL(input string) bool {

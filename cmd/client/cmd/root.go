@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
 	"time"
 
@@ -207,11 +206,7 @@ func detectContentType(r io.Reader, filename string) (string, io.Reader, error) 
 	}
 	head = head[:n]
 
-	if looksLikeText(head) {
-		contentType = "text/plain; charset=utf-8"
-	} else {
-		contentType = http.DetectContentType(head)
-	}
+	contentType = http.DetectContentType(head)
 	return contentType, io.MultiReader(bytes.NewReader(head), r), nil
 }
 
@@ -226,10 +221,6 @@ func stdinHasData() bool {
 	mode := fi.Mode()
 	// named pipe (|) or regular file redirected in
 	return mode&os.ModeNamedPipe != 0 || mode.IsRegular()
-}
-
-func looksLikeText(data []byte) bool {
-	return !slices.Contains(data, 0)
 }
 
 func Execute() {
