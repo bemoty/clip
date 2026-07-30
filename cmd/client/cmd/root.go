@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -16,6 +15,7 @@ import (
 	"time"
 
 	"github.com/bemoty/clip/cmd/client/history"
+	"github.com/bemoty/clip/internal/mimetype"
 	"github.com/gen2brain/beeep"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -189,16 +189,6 @@ func upload(r io.Reader, filename string, size int64, opts uploadOpts) error {
 }
 
 func detectContentType(r io.Reader, filename string) (string, io.Reader, error) {
-	contentType := "application/octet-stream"
-	if ext := filepath.Ext(filename); ext != "" {
-		if t := mime.TypeByExtension(ext); t != "" {
-			contentType = t
-		}
-	}
-	if contentType != "application/octet-stream" {
-		return contentType, r, nil
-	}
-
 	head := make([]byte, 512)
 	n, err := r.Read(head)
 	if err != nil && !errors.Is(err, io.EOF) {
@@ -206,8 +196,8 @@ func detectContentType(r io.Reader, filename string) (string, io.Reader, error) 
 	}
 	head = head[:n]
 
-	contentType = http.DetectContentType(head)
-	return contentType, io.MultiReader(bytes.NewReader(head), r), nil
+	result := mimetype.Sniff(head, filepath.Ext(filename))
+	return result.Type, io.MultiReader(bytes.NewReader(head), r), nil
 }
 
 // stdinHasData reports whether stdin is a pipe or regular file (i.e., has data

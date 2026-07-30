@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -20,6 +19,7 @@ import (
 	"github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
+	"github.com/bemoty/clip/internal/mimetype"
 )
 
 type Server struct {
@@ -139,11 +139,9 @@ func (s *Server) HandleServe(w http.ResponseWriter, r *http.Request) {
 	head = head[:n]
 	fullReader := io.MultiReader(bytes.NewReader(head), reader)
 
-	fileType := mime.TypeByExtension(filepath.Ext(filename))
-	if fileType == "" {
-		fileType = http.DetectContentType(head)
-	}
-	isText := strings.HasPrefix(fileType, "text/")
+	detected := mimetype.Sniff(head, filepath.Ext(filename))
+	fileType := detected.Type
+	isText := detected.IsText
 	if isText && strings.Contains(r.Header.Get("Accept"), "text/html") {
 		content, err := io.ReadAll(fullReader)
 		if err != nil {
@@ -205,9 +203,8 @@ func determineExtension(contentType, lang string) string {
 		return "." + lang
 	}
 
-	exts, err := mime.ExtensionsByType(contentType)
-	if err == nil && len(exts) > 0 {
-		return exts[0]
+	if ext := mimetype.ExtensionFor(contentType); ext != "" {
+		return ext
 	}
 
 	if lexer := lexers.MatchMimeType(contentType); lexer != nil {
